@@ -30,16 +30,12 @@ jobs:
           mvn --batch-mode clean package \
             -Dkeycloak.version=${{ steps.version.outputs.KC_VERSION }} \
             -DskipTests
-
-      - name: Rename artifact to include Keycloak version
+      - name: Locate artifact
         id: artifact
         run: |
           JAR_FILE=$(find target -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" | head -1)
-          JAR_NAME=$(basename "$JAR_FILE" .jar)
-          NEW_NAME="${JAR_NAME}-kc${{ steps.version.outputs.KC_VERSION }}.jar"
-          mv "$JAR_FILE" "target/${NEW_NAME}"
-          echo "jar_path=target/${NEW_NAME}" >> "$GITHUB_OUTPUT"
-          echo "jar_name=${NEW_NAME}" >> "$GITHUB_OUTPUT"
+          echo "jar_path=${JAR_FILE}" >> "$GITHUB_OUTPUT"
+          echo "jar_name=$(basename ${JAR_FILE})" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
