@@ -1,0 +1,57 @@
+name: Build and Release JAR by Tag
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+*" # matches Keycloak version tags, e.g. 24.0.1
+
+jobs:
+  build:
+    name: Build JAR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Extract Keycloak version from tag
+        id: version
+        run: echo "KC_VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Build JAR with Maven
+        run: |
+          mvn --batch-mode clean package \
+            -Dkeycloak.version=${{ steps.version.outputs.KC_VERSION }} \
+            -DskipTests
+
+      - name: Rename artifact to include Keycloak version
+        id: artifact
+        run: |
+          JAR_FILE=$(find target -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" | head -1)
+          JAR_NAME=$(basename "$JAR_FILE" .jar)
+          NEW_NAME="${JAR_NAME}-kc${{ steps.version.outputs.KC_VERSION }}.jar"
+          mv "$JAR_FILE" "target/${NEW_NAME}"
+          echo "jar_path=target/${NEW_NAME}" >> "$GITHUB_OUTPUT"
+          echo "jar_name=${NEW_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Keycloak ${{ steps.version.outputs.KC_VERSION }}"
+          body: |
+            ## Keycloak Custom Mapper — ${{ steps.version.outputs.KC_VERSION }}
+
+            Built against **Keycloak ${{ steps.version.outputs.KC_VERSION }}**.
+
+            ### Installation
+            Place the JAR into the `providers/` directory of your Keycloak distribution and restart the server.
+          files: ${{ steps.artifact.outputs.jar_path }}
+          fail_on_unmatched_files: true
